@@ -1,0 +1,18 @@
+{
+	"id": "nodebb-plugin-post-revisions",
+	"url": "https://github.com/BenLubar/nodebb-plugin-post-revisions",
+	"library": "./library.js",
+	"hooks": [
+		{"hook": "filter:posts.modifyUserInfo", "method": "postsModifyUserInfo"},
+		{"hook": "filter:post.edit", "method": "postEdit"},
+		{"hook": "action:post.purge", "method": "postPurge"},
+		{"hook": "filter:user.customSettings", "method": "userCustomSettings"},
+		{"hook": "action:user.saveSettings", "method": "userSaveSettings"}
+	],
+	"scripts": [
+		"static/client.js"
+	],
+	"less": [
+		"static/style.less"
+	]
+}

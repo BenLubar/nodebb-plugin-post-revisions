@@ -1,0 +1,18 @@
+{
+  "name": "nodebb-plugin-post-revisions",
+  "version": "1.0.0",
+  "description": "Saves old versions of posts. Edit history can be made public on a per-user basis.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BenLubar/nodebb-plugin-post-revisions.git"
+  },
+  "author": "Ben Lubar <ben.lubar@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/BenLubar/nodebb-plugin-post-revisions/issues"
+  },
+  "homepage": "https://github.com/BenLubar/nodebb-plugin-post-revisions#readme",
+  "nbbpm": {
+    "compatibility": "^1.5.0"
+  }
+}

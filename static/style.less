@@ -1,0 +1,103 @@
+.post-edit-history-button {
+	padding: 1px 3px 0;
+	border: 1px solid #777;
+	cursor: pointer;
+	font-size: 85%;
+	display: inline-block;
+	background-color: inherit;
+	box-shadow: 0 0 0 inset;
+	transition: 0.2s box-shadow;
+
+	&.disabled {
+		opacity: 0.75;
+		cursor: default;
+
+		.pointer {
+			cursor: default;
+		}
+	}
+
+	&:not(.disabled):hover {
+		box-shadow: 0 2px 15px -5px inset;
+	}
+
+	&:not(.disabled):active {
+		box-shadow: 0 2px 10px -2px inset;
+	}
+}
+
+.post-edit-history-viewer-background {
+	position: fixed;
+	left: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	background-color: rgba(0, 0, 0, .75);
+	z-index: 9999;
+}
+
+.post-edit-history-viewer {
+	position: fixed;
+	left: 10%;
+	right: 10%;
+	top: 5%;
+	bottom: 5%;
+	background-color: inherit;
+	z-index: 10000;
+	overflow-x: scroll;
+	white-space: nowrap;
+
+	& > div {
+		width: 50%;
+		max-height: 100%;
+		padding: 1em;
+		display: inline-block;
+		overflow: auto;
+		vertical-align: top;
+
+		.user-img, .user-icon {
+			width: 18px;
+			height: 18px;
+		}
+
+		header {
+			padding: 1em;
+			margin: -1em -1em 0.5em;
+			background-color: rgba(128, 128, 128, 0.125);
+		}
+
+		header:after {
+			clear: both;
+			content: '';
+			display: table;
+		}
+
+		header > span {
+			float: right;
+			margin-left: 0.5em;
+		}
+
+		header > .btn {
+			margin-bottom: -0.5em;
+		}
+
+		header > span:not(.timeago):not(.btn) {
+			font-style: italic;
+		}
+
+		header > a {
+			font-weight: bold;
+		}
+	}
+
+	@media screen and (max-aspect-ratio: 1/1) {
+		overflow-x: hidden;
+		overflow-y: scroll;
+
+		& > div {
+			width: 100%;
+			height: 50%;
+			display: block;
+		}
+	}
+}
