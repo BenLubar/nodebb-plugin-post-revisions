@@ -7,7 +7,7 @@ $(window).on('action:posts.loaded', function(e, data) {
 		return;
 	}
 
-	modifyEditIcon(ajaxify.data, data);
+	modifyEditIcon(ajaxify.data, data.posts);
 });
 
 $(window).on('action:posts.edited', function(e, data) {
