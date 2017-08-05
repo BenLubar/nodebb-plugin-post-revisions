@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-post-revisions",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Saves old versions of posts. Edit history can be made public on a per-user basis.",
   "repository": {
     "type": "git",

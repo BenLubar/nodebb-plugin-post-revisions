@@ -155,7 +155,7 @@ module.exports = {
 					return callback(err);
 				}
 
-				data.post.revisionCount = parseInt(postData.revisionCount, 10) + 1;
+				data.post.revisionCount = parseInt(postData.revisionCount || '0', 10) + 1;
 
 				callback(null, data);
 			});
