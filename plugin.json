@@ -14,5 +14,8 @@
 	],
 	"less": [
 		"static/style.less"
-	]
+	],
+	"modules": {
+		"diff.js": "node_modules/diff/dist/diff.js"
+	}
 }

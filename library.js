@@ -4,7 +4,87 @@ var async = module.parent.require("async");
 var privileges = module.parent.require("./privileges");
 var User = module.parent.require("./user");
 var Posts = module.parent.require("./posts");
+var Topics = module.parent.require("./topics");
 var SocketPlugins = require.main.require("./src/socket.io/plugins");
+
+function isEditHistoryPublic(uid, callback) {
+	if (!uid) {
+		return callback(null, false);
+	}
+
+	User.getSettings(uid, function(err, settings) {
+		if (err || !settings) {
+			return callback(err, false);
+		}
+
+		var visible = parseInt(settings.postEditHistoryVisible, 10) === 1;
+
+		callback(null, visible);
+	});
+}
+
+function getPostEditHistory(pid, callback) {
+	function convert(history, next) {
+		var revisions = [];
+		Object.keys(history).forEach(function(k) {
+			if (parseInt(k, 10) > 0) {
+				revisions.push(JSON.parse(history[k]));
+			}
+		});
+		revisions.sort(function(a, b) {
+			return b.ts - a.ts;
+		});
+		next(null, revisions);
+	}
+
+	db.getObject("pid:" + pid + ":postRevisions", function(err, history) {
+		if (err) {
+			return callback(err);
+		}
+
+		if (history) {
+			return convert(history, callback);
+		}
+
+		convertPostEditHistory(pid, function(err, history) {
+			if (err) {
+				return callback(err);
+			}
+
+			convert(history, callback);
+		});
+	});
+}
+
+function convertPostEditHistory(pid, callback) {
+	var _history;
+	async.waterfall([
+		function(next) {
+			db.getSortedSetRevRangeWithScores("pid:" + pid + ":revisions", 0, -1, next);
+		},
+		function(revisions, next) {
+			_history = {v: 1};
+			revisions.forEach(function(rev) {
+				var post = JSON.parse(rev.value);
+				_history[String(rev.score)] = JSON.stringify({
+					ts: rev.score,
+					topic: null,
+					post: post,
+					mode: "edit",
+					uid: post.editor
+				});
+			});
+			db.setObject("pid:" + pid + ":postRevisions", _history, function(err) {
+				next(err);
+			});
+		},
+		function(next) {
+			db.delete("pid:" + pid + ":revisions", function(err) {
+				next(err, _history);
+			});
+		},
+	], callback);
+}
 
 SocketPlugins.postRevisions = {
 	"get": function(socket, data, callback) {
@@ -13,103 +93,95 @@ SocketPlugins.postRevisions = {
 			return callback(new Error("[[error:invalid-data]]"));
 		}
 
-		async.parallel({
-			"isPublic": function(next) {
-				async.waterfall([
-					function(next) {
-						Posts.getPostField(pid, "uid", next);
-					},
-					function(uid, next) {
-						if (!uid) {
-							return next(null, {});
-						}
-						User.getSettings(uid, next);
-					},
-					function(settings, next) {
-						next(null, parseInt(settings.postEditHistoryVisible, 10) === 1);
-					}
-				], next);
-			},
-			"isSelf": function(next) {
-				async.waterfall([
-					function(next) {
-						Posts.getPostField(pid, "uid", next);
-					},
-					function(uid, next) {
-						next(null, uid && socket.uid === parseInt(uid, 10));
-					},
-				], next);
-			},
-			"isMod": function(next) {
-				async.waterfall([
-					function(next) {
-						Posts.getCidByPid(pid, next);
-					},
-					function(cid, next) {
-						privileges.categories.isAdminOrMod(cid, socket.uid, next);
-					}
-				], next);
-			}
-		}, function(err, allowed) {
-			if (err) {
-				return callback(err);
-			}
-			if (!allowed.isPublic && !allowed.isSelf && !allowed.isMod) {
-				return callback(new Error("[[error:not-allowed]]"));
-			}
+		var _history;
 
-			var _history;
+		async.waterfall([
+			function(next) {
+				async.parallel({
+					"isSelfOrPublic": function(next) {
+						async.waterfall([
+							function(next) {
+								Posts.getPostField(pid, "uid", next);
+							},
+							function(uid, next) {
+								if (uid && socket.uid === parseInt(uid, 10)) {
+									return next(null, true);
+								}
 
-			async.waterfall([
-				function(next) {
-					async.parallel({
-						"history": function(next) {
-							db.getSortedSetRevRangeWithScores("pid:" + pid + ":revisions", 0, -1, next);
-						},
-						"current": function(next) {
-							Posts.getPostData(pid, next);
-						}
-					}, next);
-				},
-				function(revisions, next) {
-					var oldest = revisions.current;
-					var history = [{
-						"content": oldest.content,
-						"editor": oldest.editor,
-						"timestamp": null,
-					}];
-					revisions.history.forEach(function(rev) {
-						var prev = JSON.parse(rev.value);
-						history.push({
-							"content": prev.content,
-							"editor": prev.editor,
-							"timestamp": rev.score
-						});
-						oldest = prev;
+								isEditHistoryPublic(uid, next);
+							}
+						], next);
+					},
+					"isMod": function(next) {
+						async.waterfall([
+							function(next) {
+								Posts.getCidByPid(pid, next);
+							},
+							function(cid, next) {
+								privileges.categories.isAdminOrMod(cid, socket.uid, next);
+							}
+						], next);
+					}
+				}, next);
+			},
+			function(allowed, next) {
+				next(!allowed.isSelfOrPublic && !allowed.isMod ?new Error("[[error:not-allowed]]") : null);
+			},
+			function(next) {
+				async.parallel({
+					"history": function(next) {
+						getPostEditHistory(pid, next);
+					},
+					"currentPost": function(next) {
+						Posts.getPostData(pid, next);
+					}
+				}, next);
+			},
+			function(revisions, next) {
+				Topics.getTopicData(revisions.currentPost.tid, function(err, topic) {
+					revisions.currentTopic = topic;
+					next(err, revisions);
+				});
+			},
+			function(revisions, next) {
+				var history = [{
+					ts: null,
+					topic: revisions.currentTopic,
+					post: revisions.currentPost,
+					mode: "current",
+					uid: null
+				}].concat(revisions.history);
+				var oldest = history[history.length - 1];
+				if (oldest.post && oldest.post.edited) {
+					history.push({
+						ts: oldest.post.edited,
+						topic: null,
+						post: null,
+						mode: "unknown",
+						uid: oldest.post.editor
 					});
-					if (oldest.edited) {
-						history.push({
-							"content": null,
-							"editor": null,
-							"timestamp": oldest.edited
-						});
-					}
-					next(null, history);
-				},
-				function(history, next) {
-					_history = history;
-					Posts.getUserInfoForPosts(history.map(function(rev) {
-						return rev.editor;
-					}), socket.uid, next);
-				},
-				function(editors, next) {
-					next(null, _history.map(function(rev, i) {
-						rev.editor = editors[i];
-						return rev;
-					}));
 				}
-			], callback);
-		});
+				next(null, history);
+			},
+			function(history, next) {
+				_history = history;
+				Posts.getUserInfoForPosts(history.map(function(rev) {
+					return rev.uid;
+				}), socket.uid, next);
+			},
+			function(users, next) {
+				next(null, _history.map(function(rev, i) {
+					rev.topic = rev.topic ? {
+						title: rev.topic.title
+					} : null;
+					rev.post = rev.post ? {
+						content: rev.post.content
+					} : null;
+					rev.user = users[i];
+					return rev;
+				}));
+			}
+		], callback);
 	},
 	"purge": function(socket, data, callback) {
 		var pid = parseInt(data.pid, 10);
@@ -127,7 +199,7 @@ SocketPlugins.postRevisions = {
 				return callback(new Error("[[error:not-allowed]]"));
 			}
 
-			db.sortedSetsRemoveRangeByScore(["pid:" + pid + ":revisions"], ts, ts, callback);
+			db.deleteObjectField("pid:" + pid + ":postRevisions", String(ts), callback);
 		});
 	}
 };
@@ -145,24 +217,38 @@ module.exports = {
 		});
 	},
 	"postEdit": function(data, callback) {
-		Posts.getPostData(data.post.pid, function(err, postData) {
-			if (err) {
-				return callback(err);
+		var _postData;
+		async.waterfall([
+			function(next) {
+				// make sure the edit history is in the current data format
+				getPostEditHistory(data.post.pid, next);
+			},
+			function(history, next) {
+				Posts.getPostData(data.post.pid, next);
+			},
+			function(postData, next) {
+				_postData = postData;
+				Topics.getTopicData(postData.tid, next);
+			},
+			function(topicData, next) {
+				var payload = {
+					ts: Date.now(),
+					topic: topicData,
+					post: _postData,
+					mode: "edit",
+					uid: data.uid
+				};
+
+				db.setObjectField("pid:" + data.post.pid + ":postRevisions", String(payload.ts), JSON.stringify(payload), next);
+			},
+			function(next) {
+				data.post.revisionCount = parseInt(data.post.revisionCount || '0', 10) + 1;
+				next(null, data);
 			}
-
-			db.sortedSetAdd("pid:" + data.post.pid + ":revisions", Date.now(), JSON.stringify(postData), function(err) {
-				if (err) {
-					return callback(err);
-				}
-
-				data.post.revisionCount = parseInt(postData.revisionCount || '0', 10) + 1;
-
-				callback(null, data);
-			});
-		});
+		], callback);
 	},
 	"postPurge": function(data) {
-		db.delete("pid:" + data.post.pid + ":revisions", function(err) {
+		db.deleteAll(["pid:" + data.post.pid + ":revisions", "pid:" + data.post.pid + ":postRevisions"], function(err) {
 			if (err) {
 				winston.error("[plugin/post-revisions] Error purging all post revisions for post " + data.post.pid + ": " + err);
 			}

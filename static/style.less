@@ -36,6 +36,14 @@
 	z-index: 9999;
 }
 
+.post-edit-history-viewer-background span {
+	position: absolute;
+	top: 96%;
+	right: 10%;
+	color: #fff;
+	cursor: pointer;
+}
+
 .post-edit-history-viewer {
 	position: fixed;
 	left: 10%;
@@ -44,64 +52,70 @@
 	bottom: 5%;
 	background-color: inherit;
 	z-index: 10000;
-	overflow-x: scroll;
+	overflow-x: hidden;
+	overflow-y: scroll;
 	white-space: nowrap;
 
 	& > div {
-		width: 50%;
-		max-height: 100%;
-		padding: 1em;
-		display: inline-block;
-		overflow: auto;
-		vertical-align: top;
+		width: 100%;
+		height: 50%;
+		display: block;
+
+		& > div {
+			height: 100%;
+			height: ~"calc(100% - 3.5em)";
+			padding: 1em 1em 0.5em;
+			overflow: auto;
+		}
 
 		.user-img, .user-icon {
 			width: 18px;
 			height: 18px;
 		}
 
-		header {
+		h2 {
+			margin-top: 0;
+		}
+
+		footer {
 			padding: 1em;
-			margin: -1em -1em 0.5em;
+			line-height: 1.5em;
 			background-color: rgba(128, 128, 128, 0.125);
 		}
 
-		header:after {
-			clear: both;
-			content: '';
-			display: table;
-		}
-
-		header > span {
+		footer > span {
 			float: right;
 			margin-left: 0.5em;
 		}
 
-		header > .btn {
+		footer > .btn {
 			margin-bottom: -0.5em;
 		}
 
-		header > span:not(.timeago):not(.btn) {
+		footer > span:not(.timeago):not(.btn) {
 			font-style: italic;
 		}
 
-		header > a {
+		footer > a {
 			font-weight: bold;
+		}
+
+		footer:after {
+			content: '';
+			display: table;
+			clear: both;
 		}
 
 		pre {
 			white-space: pre-wrap;
 		}
-	}
 
-	@media screen and (max-aspect-ratio: 1/1) {
-		overflow-x: hidden;
-		overflow-y: scroll;
+		ins {
+			background-color: rgba(64, 192, 64, 0.25);
+		}
 
-		& > div {
-			width: 100%;
-			height: 50%;
-			display: block;
+		del {
+			background-color: rgba(192, 64, 64, 0.25);
 		}
 	}
 }
